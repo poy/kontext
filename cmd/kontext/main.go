@@ -20,7 +20,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/v1util"
 
-	"github.com/mattmoor/kontext/pkg/manifest"
+	"github.com/poy/kontext/pkg/manifest"
 )
 
 var (
