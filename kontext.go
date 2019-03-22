@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -18,7 +19,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
-	"github.com/google/go-containerregistry/pkg/v1/v1util"
 	"github.com/poy/kontext/pkg/manifest"
 )
 
@@ -294,14 +294,14 @@ func writeManifest(m *manifest.Manifest) (*bytes.Buffer, error) {
 
 func combineImage(base v1.Image, layer, mlayer *bytes.Buffer) (v1.Image, error) {
 	dataLayer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
-		return v1util.NopReadCloser(bytes.NewBuffer(layer.Bytes())), nil
+		return ioutil.NopCloser(bytes.NewBuffer(layer.Bytes())), nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	jsonLayer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
-		return v1util.NopReadCloser(bytes.NewBuffer(mlayer.Bytes())), nil
+		return ioutil.NopCloser(bytes.NewBuffer(mlayer.Bytes())), nil
 	})
 	if err != nil {
 		return nil, err
