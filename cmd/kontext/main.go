@@ -12,6 +12,7 @@ import (
 var (
 	directory = flag.String("directory", "", "The directory to upload as context.")
 	tag       = flag.String("tag", "", "The tag to which we upload the context.")
+	rebase    = flag.Bool("rebase", false, "Rebase the source.")
 )
 
 func main() {
@@ -22,12 +23,13 @@ func main() {
 	}
 
 	if *tag == "" {
-		log.Fatalf("Missing required flag: --repo")
+		log.Fatalf("Missing required flag: --tag")
 	}
 
-	err := kontext.BuildImage(*directory, *tag)
+	err := kontext.BuildImage(*directory, *tag, *rebase)
 	if err == kontext.ErrNoChange {
 		fmt.Fprintln(os.Stderr, "no change in source context (or empty)")
+		return
 	}
 
 	if err != nil {

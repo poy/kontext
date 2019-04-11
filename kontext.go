@@ -26,13 +26,17 @@ var (
 	ErrNoChange = errors.New("no change in source context (or empty)")
 )
 
-func BuildImage(directory, tag string) error {
+func BuildImage(directory, tag string, rebase bool) error {
+	return BuildImageWithFilter(directory, tag, rebase, func(string) (bool, error) { return true, nil })
+}
+
+func BuildImageWithFilter(directory, tag string, rebase bool, filter func(path string) (bool, error)) error {
 	targetTag, err := name.NewTag(tag, name.WeakValidation)
 	if err != nil {
 		return fmt.Errorf("invalid repo: %q: %v", tag, err)
 	}
 
-	base, m, err := findBaseImage(targetTag)
+	base, m, err := findBaseImage(targetTag, rebase)
 	if err != nil {
 		return fmt.Errorf("error finding base image: %v", err)
 	}
@@ -40,7 +44,7 @@ func BuildImage(directory, tag string) error {
 	// TODO(mattmoor): Consider applying heuristics around *whether* to use this base image
 	// (or some subset thereof) or whether to fallback on the clean base.
 
-	layer, delta, err := writeNewFiles(directory, m)
+	layer, delta, err := writeNewFiles(directory, m, filter)
 	if err != nil {
 		return fmt.Errorf("Error computing delta layer: %v", err)
 	}
@@ -93,15 +97,21 @@ var (
 //   value for Manifest.
 // 2. Use this as the value for baseImage.
 // The default base image is the self-extracting base, with an empty manifest.
-func findBaseImage(targetTag name.Tag) (v1.Image, *manifest.Manifest, error) {
+func findBaseImage(targetTag name.Tag, rebase bool) (v1.Image, *manifest.Manifest, error) {
 	fallback := func(err error) (v1.Image, *manifest.Manifest, error) {
-		log.Printf("Error accessing %v, falling back on a clean slate: %v", targetTag, err)
+		if rebase {
+			log.Printf("Error accessing %v, falling back on a clean slate: %v", targetTag, err)
+		}
 		// Fallback on the defaultBaseImage, with an empty manifest.
 		base, err := remote.Image(defaultBaseImage, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 		if err != nil {
 			return nil, nil, err
 		}
 		return base, &manifest.Manifest{}, nil
+	}
+
+	if !rebase {
+		return fallback(nil)
 	}
 
 	// First, try to access the target image, and see if it has what we need.
@@ -148,7 +158,7 @@ func findBaseImage(targetTag name.Tag) (v1.Image, *manifest.Manifest, error) {
 //   https://github.com/google/go-containerregistry/blob/7842f2e9ee14544/pkg/ko/build/gobuild.go#L174
 // The major change to this is that before files are added, we determine whether
 // they already exist via the Manifest.
-func writeNewFiles(directory string, m *manifest.Manifest) (*bytes.Buffer, int, error) {
+func writeNewFiles(directory string, m *manifest.Manifest, filter func(path string) (bool, error)) (*bytes.Buffer, int, error) {
 	buf := bytes.NewBuffer(nil)
 	tw := tar.NewWriter(buf)
 	defer tw.Close()
@@ -191,6 +201,11 @@ func writeNewFiles(directory string, m *manifest.Manifest) (*bytes.Buffer, int, 
 			if m.Has(relativePath) {
 				return nil
 			}
+
+			if ok, err := filter(relativePath); !ok || err != nil {
+				return err
+			}
+
 			count++
 			m.Add(relativePath, i)
 			newPath := filepath.Join(BasePath, relativePath)
@@ -199,7 +214,7 @@ func writeNewFiles(directory string, m *manifest.Manifest) (*bytes.Buffer, int, 
 				return tw.WriteHeader(&tar.Header{
 					Name:     newPath,
 					Typeflag: tar.TypeDir,
-					Mode:     0555,
+					Mode:     int64(info.Mode().Perm()),
 				})
 			}
 
@@ -215,10 +230,8 @@ func writeNewFiles(directory string, m *manifest.Manifest) (*bytes.Buffer, int, 
 				Name:     newPath,
 				Size:     info.Size(),
 				Typeflag: tar.TypeReg,
-				// Use a fixed Mode, so that this isn't sensitive to the directory and umask
-				// under which it was created. Additionally, windows can only set 0222,
-				// 0444, or 0666, none of which are executable.
-				Mode: 0555,
+				// TODO: There might be some issues with windows here.
+				Mode: int64(info.Mode().Perm()),
 			}); err != nil {
 				return err
 			}
@@ -278,7 +291,7 @@ func writeManifest(m *manifest.Manifest) (*bytes.Buffer, error) {
 		// Use a fixed Mode, so that this isn't sensitive to the directory and umask
 		// under which it was created. Additionally, windows can only set 0222,
 		// 0444, or 0666, none of which are executable.
-		Mode: 0555,
+		Mode: 0666,
 	}
 	// write the header to the tarball archive
 	if err := tw.WriteHeader(header); err != nil {
