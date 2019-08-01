@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"io"
 	"log"
 	"os"
@@ -8,8 +9,7 @@ import (
 )
 
 const (
-	BasePath   = "/var/run/kontext"
-	TargetPath = "/workspace"
+	BasePath = "/var/run/kontext"
 )
 
 func copy(src, dest string, info os.FileInfo) error {
@@ -33,6 +33,9 @@ func copy(src, dest string, info os.FileInfo) error {
 }
 
 func main() {
+	targetPath := flag.String("output_dir", "/workspace", "The directory the contents are extracted to.")
+	flag.Parse()
+
 	err := filepath.Walk(BasePath,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -42,7 +45,7 @@ func main() {
 				return nil
 			}
 			relativePath := path[len(BasePath)+1:]
-			target := filepath.Join(TargetPath, relativePath)
+			target := filepath.Join(*targetPath, relativePath)
 
 			if info.IsDir() {
 				return os.MkdirAll(target, info.Mode())

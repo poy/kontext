@@ -41,7 +41,7 @@ func BuildImageWithFilter(directory, tag string, rebase bool, filter func(path s
 		return fmt.Errorf("error finding base image: %v", err)
 	}
 
-	// TODO(mattmoor): Consider applying heuristics around *whether* to use this base image
+	// TODO: Consider applying heuristics around *whether* to use this base image
 	// (or some subset thereof) or whether to fallback on the clean base.
 
 	layer, delta, err := writeNewFiles(directory, m, filter)
@@ -49,7 +49,7 @@ func BuildImageWithFilter(directory, tag string, rebase bool, filter func(path s
 		return fmt.Errorf("Error computing delta layer: %v", err)
 	}
 
-	// TODO(mattmoor): We should publish base to targetTag in this case to make sure targetTag
+	// TODO: We should publish base to targetTag in this case to make sure targetTag
 	// always has the image.  Although, perhaps we'll always create an entry for the empty
 	// directory itself?  This warrants some experimentation.
 	if delta == 0 {
@@ -87,7 +87,7 @@ const (
 
 var (
 	defaultBaseImage, _ = name.ParseReference(
-		"gcr.io/mattmoor-public/github.com/mattmoor/kontext/cmd/extractor:latest",
+		"gcr.io/kf-releases/github.com/poy/kontext/cmd/extractor:latest",
 		name.WeakValidation)
 )
 
