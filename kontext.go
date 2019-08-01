@@ -15,7 +15,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
@@ -165,8 +165,18 @@ func writeNewFiles(directory string, m *manifest.Manifest, filter func(path stri
 
 	count := 0
 
+	walkPath := directory
+	dir, err := isDir(directory)
+	if err != nil {
+		return nil, 0, err
+	}
+	if !dir {
+		// The given directory is ACTUALLY a file path.
+		directory = filepath.Dir(directory)
+	}
+
 	var allPaths []string
-	err := filepath.Walk(directory,
+	err = filepath.Walk(walkPath,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -322,4 +332,12 @@ func combineImage(base v1.Image, layer, mlayer *bytes.Buffer) (v1.Image, error) 
 
 	// Augment the base image with our application layer.
 	return mutate.AppendLayers(base, dataLayer, jsonLayer)
+}
+
+func isDir(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	return info.IsDir(), err
 }
