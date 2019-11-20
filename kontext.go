@@ -73,7 +73,7 @@ func BuildImageWithFilter(directory, tag string, rebase bool, filter func(path s
 		return fmt.Errorf("Error getting creds for %q: %v", targetTag, err)
 	}
 
-	if err := remote.Write(targetTag, combinedImage, auth, http.DefaultTransport); err != nil {
+	if err := remote.Write(targetTag, combinedImage, remote.WithAuth(auth), remote.WithTransport(http.DefaultTransport)); err != nil {
 		return fmt.Errorf("Error publishing image: %v", err)
 	}
 
